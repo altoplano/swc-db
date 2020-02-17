@@ -31,7 +31,9 @@ class Key final {
   virtual ~Key() {
     free();
   }
-  
+
+  Key operator=(const Key &other) = delete;
+
   void free() {
     if(empty())
       return;

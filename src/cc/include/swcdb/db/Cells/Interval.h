@@ -77,12 +77,12 @@ class Interval final {
   }
 
   void set_aligned_min(const DB::Cell::Key& key) {
-    aligned_min = key;
+    aligned_min.copy(key);
     was_set = true;
   }
 
   void set_aligned_max(const DB::Cell::Key& key) {
-    aligned_max = key;
+    aligned_max.copy(key);
     was_set = true;
   }
 
