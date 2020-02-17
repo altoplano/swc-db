@@ -28,16 +28,21 @@ int main() {
       cell.timestamp = n;
 
       interval.expand(cell);
+      cell.key.align(interval.aligned_min, interval.aligned_max);
 
       if(n == 0) {
         expected_expanded.set_key_end(cell.key);
         expected_expanded.set_ts_earliest(DB::Specs::Timestamp(n, Condition::GE));
+        expected_expanded.set_aligned_max(cell.key);
       }
       if(n == num_keys) {
         expected_expanded.set_key_begin(cell.key);
         expected_expanded.set_ts_latest(DB::Specs::Timestamp(n, Condition::LE));
+        expected_expanded.set_aligned_min(cell.key);
       }
+      //std::cout << interval.to_string() << "\n";
   }
+
   std::cout << " init OK\n";
   std::cout << "\n";
 

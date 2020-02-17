@@ -51,8 +51,10 @@ struct Item final {
   }
 
   ~Item() { 
-    if(data_)
+    if(data_) {
       delete data_;
+      data_ = nullptr;
+    }
   } 
 
   const uint32_t size() const {

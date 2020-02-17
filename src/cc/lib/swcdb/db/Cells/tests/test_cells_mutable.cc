@@ -276,5 +276,16 @@ int main(int argc, char** argv) {
   //for(auto i=1; i<=10000000; i*=10)
   //  check(i);
 
+
+  if(SWC::Env::PageArena.count()) {
+  
+    for(auto idx=SWC::Env::PageArena.pages() ; idx;) {
+      for(auto item : SWC::Env::PageArena.page(--idx)) {
+        std::cout << item->to_string() << "= counted(" << item->count << ")\n";
+      }
+    }
+    assert(!SWC::Env::PageArena.count());
+  }
+  
   exit(0);
 }

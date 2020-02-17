@@ -141,12 +141,12 @@ class RangeBase : public std::enable_shared_from_this<RangeBase> {
     std::shared_lock lock(m_mutex);
     return (
         m_interval.key_begin.empty() || 
-        m_interval.key_begin.count == any_is ||
+        m_interval.key_begin.size() == any_is ||
         range_end.empty() || 
         range_end.compare(m_interval.key_begin) != Condition::GT
       ) && (
         m_interval.key_end.empty() || 
-        m_interval.key_end.count == any_is ||
+        m_interval.key_end.size() == any_is ||
         range_begin.empty() || 
         range_begin.compare(m_interval.key_end) != Condition::LT
       );

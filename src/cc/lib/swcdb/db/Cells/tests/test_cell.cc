@@ -103,16 +103,18 @@ int main() {
       //std::cout << (*it)->to_string() << "\n\n";
       // cells_copied.push_back(*(new Cells::Cell(*it)));  // OK 
       cells_copied.push_back(Cells::Cell(**it));            // OK
-
-      std::cout << " ptrs-orig key:"<<(size_t)(*it)->key.data 
+      
+      /*
+      std::cout << " ptrs-orig key:"<<(size_t)(*it)->key.data()
                 << " value:"<<(size_t)(*it)->value << "\n";
-      std::cout << " ptrs-copy key:"<<(size_t)cells_copied.back().key.data  
+      std::cout << " ptrs-copy key:"<<(size_t)cells_copied.back().key.data()  
                 << " value:"<<(size_t)cells_copied.back().value << "\n";
 
-      if((*it)->key.data == cells_copied.back().key.data || (*it)->value == cells_copied.back().value){
+      if((*it)->key.data() == cells_copied.back().key.data() || (*it)->value == cells_copied.back().value){
          std::cout << "COPY PTRs SHOUT NOT BE EQUAL:\n";
          exit(1);
       }
+      */
       if(!(*it)->equal(cells_copied.back())){
          std::cout << "COPY NOT EQUAL:\n";
          std::cout << (*cells.begin())->to_string() << "\n\n";
@@ -181,27 +183,11 @@ int main() {
    std::cout << "\n-------------------------------\n";
 
 
-   std::cout << "\n----Destruction Cells----------\n";
 
-   size_t k_len = cells_copied.back().key.size;
-   uint8_t* last_skey = new uint8_t[k_len];
-   uint8_t* last_skey_ptr = cells_copied.back().key.data;
-   memcpy(last_skey, last_skey_ptr, k_len);
-   
-   cells_copied.clear();
-   //cells_copied.clear();
-   if (*last_skey_ptr != 0 && memcmp(last_skey, last_skey_ptr, k_len) == 0){
-         std::cout << "DESTRUCTION DID NOT HAPPEN:\n";
-         std::cout << (size_t)last_skey_ptr << ":" << std::string((const char *)last_skey_ptr, k_len) 
-            << "==" << std::string((const char *)last_skey, k_len)<< "\n\n";
-         exit(1);
-   }
-   delete []last_skey;
 
 
    std::cout << " sizeof(SWC::DB::Cells::Cell)=" << sizeof(SWC::DB::Cells::Cell) << "\n";
    std::cout << " sizeof(SWC::DB::Cell::Key)=" << sizeof(SWC::DB::Cell::Key) << "\n";
-   std::cout << " sizeof(SWC::DB::Cell::KeyVec)=" << sizeof(SWC::DB::Cell::KeyVec) << "\n";
    check_load();;
    std::cout << "\n-------------------------------\n";
 

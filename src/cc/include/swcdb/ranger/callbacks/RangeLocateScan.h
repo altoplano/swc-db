@@ -55,7 +55,7 @@ class RangeLocateScan : public DB::Cells::ReqScan {
     key_end.decode(&ptr, &remain);
 
     bool match;
-    if(match = key_end.count == any_is ||
+    if(match = key_end.size() == any_is ||
                key_end.compare(spec.range_begin) != Condition::GT)
       stop = true;
     return match;
@@ -69,7 +69,7 @@ class RangeLocateScan : public DB::Cells::ReqScan {
        spec.range_offset.compare(cell.key) != Condition::GT)
       return false;
 
-    if(cell.key.count > any_is && spec.range_end.count > any_is && 
+    if(cell.key.size() > any_is && spec.range_end.size() > any_is && 
        !spec.is_matching_end(cell.key)) {
       stop = true;
       //std::cout << "-- KEY-BEGIN NO MATCH STOP --\n";
@@ -81,7 +81,7 @@ class RangeLocateScan : public DB::Cells::ReqScan {
     DB::Cell::Key key_end;
     key_end.decode(&ptr, &remain);
 
-    if(key_end.count > any_is && spec.range_begin.count > any_is && 
+    if(key_end.size() > any_is && spec.range_begin.size() > any_is && 
        !spec.is_matching_begin(key_end)) {
       //std::cout << "-- KEY-END NO MATCH --\n";
       return false;
@@ -90,9 +90,9 @@ class RangeLocateScan : public DB::Cells::ReqScan {
 
     int64_t rid = Serialization::decode_vi64(&ptr, &remain); // rid
 
-    DB::Cell::KeyVec aligned_min;
+    DB::Cell::Key aligned_min;
     aligned_min.decode(&ptr, &remain);
-    DB::Cell::KeyVec aligned_max;
+    DB::Cell::Key aligned_max;
     aligned_max.decode(&ptr, &remain);
     /*
     std::cout << "---------------------\n";
@@ -104,12 +104,12 @@ class RangeLocateScan : public DB::Cells::ReqScan {
     std::cout << "aligned_max: " << aligned_max.to_string() << "\n";
     std::cout << "        rid: " << rid << "\n";
     */
-    if(spec.range_begin.count == any_is ||
+    if(spec.range_begin.size() == any_is ||
        spec.range_begin.compare(
-         aligned_max, Condition::LT, spec.range_begin.count, true)) {
-      if(spec.range_end.count == any_is ||
+         aligned_max, Condition::LT, spec.range_begin.size(), true)) {
+      if(spec.range_end.size() == any_is ||
          spec.range_end.compare(
-           aligned_min, Condition::GT, spec.range_end.count, true)) {
+           aligned_min, Condition::GT, spec.range_end.size(), true)) {
         //std::cout << "-- ALIGNED MATCH  --\n";
         return true;
       }
@@ -142,7 +142,7 @@ class RangeLocateScan : public DB::Cells::ReqScan {
   
         params.range_begin.copy(cell.key);
         
-        std::string id_name(params.range_begin.get_string(0));
+        std::string id_name(params.range_begin.get(0));
         params.cid = (int64_t)strtoll(id_name.c_str(), NULL, 0);
 
         const uint8_t* ptr = cell.value;
@@ -157,8 +157,8 @@ class RangeLocateScan : public DB::Cells::ReqScan {
         params.range_begin.remove(0);
         params.range_end.remove(0);
       /*
-      } else if(spec.range_begin.count > 1) {
-        spec.range_begin.remove(spec.range_begin.count-1, true);
+      } else if(spec.range_begin.size() > 1) {
+        spec.range_begin.remove(spec.range_begin.size()-1, true);
         range->scan(get_req_scan());
         return;
       */

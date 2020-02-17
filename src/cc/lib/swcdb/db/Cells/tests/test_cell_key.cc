@@ -36,7 +36,7 @@ void test_basic(){
   key.get(3, &fraction, &length);
   std::cout << std::string(fraction, length) << "(" << length <<"),";
 
-  std::cout << "\nfractions-count=" <<  key.count <<"\n";
+  std::cout << "\nfractions-count=" <<  key.size() <<"\n";
   std::cout <<  key.to_string() <<"\n";
 
   std::cout << "key.equal(key) \n";
@@ -103,15 +103,16 @@ void test_basic(){
   spec_key.add(std::string("ghi"), Condition::GE);
   spec_key.add("jkl", Condition::GT);
 
-  spec_key.get(0, &fraction, &length, &comp);
-  std::cout << std::string(fraction, length) << "(" << length <<"),"  << " " << comp << ",";
-  spec_key.get(1, &fraction, &length, &comp);
-  std::cout << std::string(fraction, length) << "(" << length <<"),"  << " " << comp << ",";
-  spec_key.get(2, &fraction, &length, &comp);
-  std::cout << std::string(fraction, length) << "(" << length <<"),"  << " " << comp << ",";
-  spec_key.get(3, &fraction, &length, &comp);
-  std::cout << std::string(fraction, length) << "(" << length <<"),"  << " " << comp << ",";
-  std::cout << "\nfractions-count=" <<  spec_key.count <<"\n";
+  std::string_view vw;
+  vw = spec_key.get(0, comp);
+  std::cout << vw << "(" << vw.length() <<"),"  << " " << comp << ",";
+  vw = spec_key.get(1, comp);
+  std::cout << vw << "(" << vw.length() <<"),"  << " " << comp << ",";
+  vw = spec_key.get(2, comp);
+  std::cout << vw << "(" << vw.length() <<"),"  << " " << comp << ",";
+  vw = spec_key.get(3, comp);
+  std::cout << vw << "(" << vw.length() <<"),"  << " " << comp << ",";
+  std::cout << "\nfractions-count=" <<  spec_key.size() <<"\n";
   std::cout <<  spec_key.to_string() <<"\n";
 
   std::cout << "spec_key.is_matching(key) \n";
@@ -233,7 +234,7 @@ void load_check_key(int chks, int num_fractions, int chk_count) {
   for(auto b=0; b<num_fractions; b++)
     key.add(std::to_string(b+2^60));
     
-  size_t sz = sizeof(key)+key.size;
+  size_t sz = sizeof(key)+key.size()*sizeof(DB::Cell::Fraction);
 
   std::cout << "Cell::Key,    sz=" << sz
                     << " add=" << took_add 
@@ -250,65 +251,9 @@ void load_check_key(int chks, int num_fractions, int chk_count) {
 }
 
 
-void load_check_key_vec(int chks, int num_fractions, int chk_count) {
-
-  std::string fraction;
-  uint64_t took_add = 0, took_get = 0, took_remove = 0, took_insert = 0;
-
-  for(int n=0; n < chks; n++) {
-    DB::Cell::KeyVec key;
-
-    auto ts = std::chrono::system_clock::now();
-    for(auto b=0;b<num_fractions;b++)
-      key.add(std::to_string(b+2^60));
-    took_add += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now() - ts).count();
-
-    ts = std::chrono::system_clock::now();
-    for(auto b=0;b<num_fractions;b++) 
-      key.get(b, fraction);
-    took_get += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now() - ts).count();
-
-    ts = std::chrono::system_clock::now();
-    for(auto b=0;b<num_fractions;b++)
-      key.remove(0);
-    took_remove += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now() - ts).count();
-
-    ts = std::chrono::system_clock::now();
-    for(auto b=0;b<num_fractions;b++)
-      key.insert(0, std::to_string(b+2^60));
-    took_insert += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now() - ts).count();
-  }
-        
-
-  
-  DB::Cell::KeyVec key;
-  size_t sz = sizeof(key);
-  for(auto b=0; b<num_fractions; b++) {
-    key.add(std::to_string(b+2^60));
-    sz += sizeof(key.back()) + key.back().length();
-  }
-
-  std::cout << "Cell::KeyVec, sz=" << sz
-                    << " add=" << took_add 
-                    << " remove=" << took_remove
-                    << " insert=" << took_insert
-                    << " get=" << took_get
-                    << " avg(add)=" << took_add/chks 
-                    << " avg(remove)=" << took_remove/chks 
-                    << " avg(insert)=" << took_insert/chks 
-                    << " avg(get)=" << took_get/chks 
-                    << " total=" << took_add+took_remove+took_insert+took_get
-                    <<  "\n";
-  
-}
-
 void load_check_vec(int chks, int num_fractions, int chk_count) {
 
-  std::string s;
+  std::string_view s;
   const char* fraction;
   uint32_t    length; 
   uint64_t took_add = 0, took_get = 0, took_remove = 0, took_insert = 0;
@@ -378,8 +323,17 @@ int main() {
   for(int fractions = 0;fractions<=500;fractions+=10){
     std::cout << "fractions=" << fractions << "\n";
     load_check_key(chks, fractions, chk_count);
-    load_check_key_vec(chks, fractions, chk_count);
     load_check_vec(chks, fractions, chk_count);
+  }
+
+  if(SWC::Env::PageArena.count()) {
+  
+    for(auto idx=SWC::Env::PageArena.pages() ; idx;) {
+      for(auto item : SWC::Env::PageArena.page(--idx)) {
+        std::cout << item->to_string() << "= counted(" << item->count << ")\n";
+      }
+    }
+    assert(!SWC::Env::PageArena.count());
   }
 
   exit(0);

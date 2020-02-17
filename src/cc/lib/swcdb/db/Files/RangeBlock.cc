@@ -440,7 +440,7 @@ const bool Block::_scan(DB::Cells::ReqScan::Ptr req, bool synced) {
       skips, 
       req->selector()
     );
-    //}
+    //} 
   }
 
   processing_decrement();

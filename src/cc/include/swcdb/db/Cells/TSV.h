@@ -92,25 +92,21 @@ class FileWriter {
       buffer.add(ts.data(), ts.length());
       buffer.add("\t", 1); //
     }
-
-    uint32_t len = 0;
+    
+    uint32_t n=0;
     std::string f_len;
-    const uint8_t* ptr = cell.key.data;
-    for(uint32_t n=1; n<=cell.key.count; n++,ptr+=len) {
-      len = Serialization::decode_vi32(&ptr);
-      f_len = std::to_string(len);
+    for(auto f : cell.key) {
+      f_len = std::to_string(f->size());
       buffer.add(f_len.data(), f_len.length());
-      if(n < cell.key.count)
+      if(++n < cell.key.size())
         buffer.add(",", 1);
     }
     buffer.add("\t", 1); //
   
-    ptr = cell.key.data;
-    for(uint32_t n=1; n<=cell.key.count; n++,ptr+=len) {
-      len = Serialization::decode_vi32(&ptr);
-      if(len)
-        buffer.add(ptr, len);
-      if(n < cell.key.count)
+    for(auto f : cell.key) {
+      if(f->size())
+        buffer.add(f->data(), f->size());
+      if(++n < cell.key.size())
         buffer.add(",", 1);
     }
     buffer.add("\t", 1); //
@@ -483,6 +479,7 @@ class FileReader {
     
     s = ++ptr; // tab
     remain--;
+    cell.key.free();
     for(auto len : flen) {
       if(remain <= len+1) 
         return false;

@@ -76,12 +76,12 @@ class Interval final {
     was_set = true;
   }
 
-  void set_aligned_min(const DB::Cell::KeyVec& key) {
+  void set_aligned_min(const DB::Cell::Key& key) {
     aligned_min = key;
     was_set = true;
   }
 
-  void set_aligned_max(const DB::Cell::KeyVec& key) {
+  void set_aligned_max(const DB::Cell::Key& key) {
     aligned_max = key;
     was_set = true;
   }
@@ -111,6 +111,7 @@ class Interval final {
   void expand(const Cell& cell) {
     expand_begin(cell);
     expand_end(cell);
+    expand(cell.timestamp);
     was_set = true;
   }
 
@@ -262,8 +263,8 @@ class Interval final {
   DB::Cell::Key     key_end;  
   Specs::Timestamp  ts_earliest;
   Specs::Timestamp  ts_latest;
-  DB::Cell::KeyVec  aligned_min;
-  DB::Cell::KeyVec  aligned_max;  
+  DB::Cell::Key     aligned_min;
+  DB::Cell::Key     aligned_max;  
   bool              was_set = false;
 };
 

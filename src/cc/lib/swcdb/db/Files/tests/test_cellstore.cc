@@ -42,7 +42,7 @@ void apply_key(const std::string& idn,
   key.add("F6");
   key.add(gn);
  
-  if(key.get_string(0).compare("") == 0) {
+  if(key.get(0).compare("") == 0) {
     std::cout << "BAD: " << key.to_string() << "\n";
     exit(1);
   }
@@ -93,7 +93,7 @@ size_t write_cs(int id, SWC::DB::RangeBase::Ptr range, int any) {
       cell.write(buff);
       cell_count++;
       blk_intval.expand(cell);   
-      if(blk_intval.key_begin.get_string(0).compare("") == 0) {
+      if(blk_intval.key_begin.get(0).compare("") == 0) {
         std::cout << cell.to_string() << "\n";
         std::cout << "expand: " << blk_intval.to_string() << "\n";
         exit(1);
