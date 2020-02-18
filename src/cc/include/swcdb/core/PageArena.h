@@ -7,6 +7,7 @@
 
 #include <mutex>
 #include "swcdb/core/LockAtomicUnique.h"
+#include "swcdb/core/Comparators.h"
 
 #include <unordered_set>
 #include <string>
@@ -41,20 +42,23 @@ struct Item final {
       : count(0), size_(size), data_(ptr), hash_(_hash()) {
   }
 
-  size_t _hash() {
-    return std::hash<std::string_view>{}(
-      std::string_view((const char*)data_, size_));
+  const size_t _hash() {
+    size_t ret = 0;
+    const uint8_t* dp = data_;
+    for(uint32_t sz = size_; sz; --sz)
+      ret += (ret << 3) + *dp++;
+    return ret;
+    //return std::hash<std::string_view>{}(
+    //  std::string_view((const char*)data_, size_));
   }
 
-  void allocate(const uint8_t* ptr) {
-    data_ = (uint8_t*)memcpy(new uint8_t[size_], ptr, size_);
+  void allocate() {
+    data_ = (uint8_t*)memcpy(new uint8_t[size_], data_, size_);
   }
 
   ~Item() { 
-    if(data_) {
+    if(data_)
       delete data_;
-      data_ = nullptr;
-    }
   } 
 
   const uint32_t size() const {
@@ -84,10 +88,6 @@ struct Item final {
     return std::string_view((const char*)data_, size_);
   }
 
-  bool equal(const Item& other) const {
-    return size_ == other.size() && memcmp(data_, other.data(), size_) == 0;
-  }
-
   bool less(const Item& other) const {
     return size_ < other.size_ ||
            (size_ == other.size() && memcmp(data_, other.data(), size_) < 0);
@@ -95,19 +95,19 @@ struct Item final {
 
 
   struct Equal {
-    bool operator()(Ptr lhs, Ptr rhs ) const {
-      return lhs->equal(*rhs);
+    bool operator()(const Ptr lhs, const Ptr rhs) const {
+      return Condition::eq(lhs->data(), lhs->size(), rhs->data(), rhs->size());
     }
   };
 
   struct Hash {
-    size_t operator()(Ptr arr) const noexcept {
+    size_t operator()(const Ptr arr) const noexcept {
       return arr->hash();
     }
   };
 
   struct Less {
-    bool operator()(Ptr lhs, Ptr rhs ) const {
+    bool operator()(const Ptr lhs, const Ptr rhs) const {
       return lhs->less(*rhs);
     }
   };
@@ -117,11 +117,11 @@ struct Item final {
 
 
 
-
-class Page : 
-  public std::unordered_set<Item::Ptr, Item::Hash, Item::Equal> {
+typedef std::unordered_set<Item::Ptr, Item::Hash, Item::Equal> PageBase;
+class Page : public PageBase {
   //public std::set<Item::Ptr, Item::Less> {
   public:
+  Page() : PageBase(8) { }
   
   Item::Ptr use(const uint8_t* buf, uint32_t size) {
     LockAtomic::Unique::Scope lock(m_mutex);
@@ -130,7 +130,7 @@ class Page :
     auto tmp = new Item(buf, size);
     auto r = insert(tmp);
     if(r.second) {
-      (*r.first)->allocate(buf);
+      (*r.first)->allocate();
     } else { 
       tmp->data_ = nullptr;
       delete tmp;
