@@ -16,49 +16,120 @@ namespace SWC { namespace DB { namespace Cell {
   
 using Fraction = Mem::Item::Ptr;
 
-class Key : public std::vector<Fraction> {
+class Key final {
+  private:
+
+  typedef Fraction*    Fractions;
+  Fraction*            _fractions;
+  uint32_t             _size;
+  static const uint8_t  _szof = sizeof(Fractions);
+
+  void _add(Fraction ptr) {
+    auto old = _fractions;
+    _fractions = (Fractions)memcpy(new Fraction[++_size], old, _size*_szof);
+    delete [] old;
+    *(_fractions + _size - 1) = ptr;
+  }
+
+  void _insert(const uint32_t idx, Fraction ptr) {
+    if(!_size)
+      return _add(ptr);
+
+    auto old = _fractions;
+    _fractions = new Fraction[++_size];
+    if(idx)
+      memcpy(_fractions, old, idx*_szof);
+      
+    if(_size-1 >= idx+1)
+      memcpy(_fractions+idx+1, old+idx, (_size-1 - idx) * _szof);
+    delete [] old;
+
+    *(_fractions + idx) = ptr;
+  }
+
+  void _set(const uint32_t idx, Fraction ptr) {
+    auto f = _fractions + idx;
+    (*f)->release();
+    *f = ptr;
+  }
+  
+
   public:
 
   typedef std::shared_ptr<Key>  Ptr;
-  using std::vector<Fraction>::vector;
-  using std::vector<Fraction>::insert;
 
-  Key operator=(const Key &other) = delete;
-
-  explicit Key(const Key &other) {
-    assign(other.begin(), other.end());
-    for(auto it = begin(); it < end(); ++it)
-      (*it)->use();
+  explicit Key(): _fractions(0), _size(0)  { }
+  
+  explicit Key(const Key &other): _fractions(0), _size(0) {
+    copy(other);
   }
   
   virtual ~Key() {
     free();
   }
 
+  Key operator=(const Key &other) = delete;
+
   void free() {
-    for(auto it = begin(); it < end(); ++it)
-      (*it)->release();
-    clear();
+    if(!_size || !_fractions)
+      return;
+    do {
+      (*(_fractions+(--_size)))->release();
+    } while (_size);
+    delete [] _fractions;
+    _size = 0;
+    _fractions = nullptr;
   }
 
   void copy(const Key &other) {
     free();
-    assign(other.begin(), other.end());
-    for(auto it = begin(); it < end(); ++it)
-      (*it)->use();
+    if(!other._size || !other._fractions)
+      return;
+
+    
+    auto ptr = _fractions = new Fraction[_size = other._size];
+    auto ptr2 = other._fractions;
+    auto end = ptr2 + _size;
+    do {
+      *ptr-- = (*ptr2)->use();
+    } while(--ptr2 < end);
+  }
+
+  const uint32_t size() const {
+    return _size;
+  }
+
+  const bool empty() const {
+    return !_size;
   }
 
   const bool equal(const Key &other) const {
-    return *this == other;
+    return Condition::eq(
+      (const uint8_t*)_fractions, _size*_szof, 
+      (const uint8_t*)other._fractions, other._size*_szof);
+  }
+
+  Fractions begin() const {
+    return _fractions;
+  }
+  Fractions end() const {
+    return _fractions + _size;
+  }
+  
+  Fraction& operator[](uint32_t pos) {
+    return *(begin()+pos);
+  }
+  const Fraction& operator[](uint32_t pos) const {
+    return *(begin()+pos);
   }
 
   //add fraction
   void add(const uint8_t* buf, const uint32_t len) {
-    push_back(Mem::Item::make(buf, len));
+    _add(Mem::Item::make(buf, len));
   }
 
   void add(Fraction fraction) {    
-    push_back(fraction->use());
+    _add(fraction->use());
   }
 
   void add(const std::string& fraction) {
@@ -79,7 +150,7 @@ class Key : public std::vector<Fraction> {
 
   //insert fraction
   void insert(const uint32_t idx, const uint8_t* buf, const uint32_t len) {
-    insert(begin()+idx, Mem::Item::make(buf, len));
+    _insert(idx, Mem::Item::make(buf, len));
   }
 
   void insert(const uint32_t idx, const char* fraction, const uint32_t len) {
@@ -99,12 +170,6 @@ class Key : public std::vector<Fraction> {
   }
 
   //set fraction
-  void _set(const uint32_t idx, Fraction fraction) {    
-    auto it = begin() + idx;
-    (*it)->release();
-    *it = fraction;
-  }
-
   void set(const uint32_t idx, const uint8_t* buf, const uint32_t len) {
     _set(idx, Mem::Item::make(buf, len));
   }
@@ -127,23 +192,36 @@ class Key : public std::vector<Fraction> {
 
   //remove fraction
   void remove(const uint32_t idx, bool recursive=false) {
-    if(idx >= size())
+    if(idx >= _size)
       return;
-    auto it = begin()+idx;
-    if(!recursive) {
-      (*it)->release();
-      erase(it);
-    } else {
-      for(;it<end();++it) {
-        (*it)->release();
-        erase(it);
-      }
+    (*this)[idx]->release();
+
+    if(!--_size) {
+      delete [] _fractions;
+      _fractions = nullptr;
+      return;
     }
+
+    auto old = _fractions;
+    _fractions = new Fraction[_size];
+    if(idx)
+      memcpy(_fractions, old, idx * _szof);
+
+    if(recursive) {
+      uint32_t size = _size - 1;
+      do {
+        (*(old+(--size)))->release();
+      } while (size);
+
+    } else if(_size >= idx+1) {
+      memcpy(_fractions+idx, old+idx+1, (_size - idx) * _szof);
+    }
+    delete [] old;
   }
 
   //get fraction
   const std::string_view get(const uint32_t idx) const {
-    return (*(begin() + idx))->to_string();
+    return (*this)[idx]->to_string();
   }
 
   void get(const uint32_t idx, std::string& fraction) const {
@@ -155,18 +233,20 @@ class Key : public std::vector<Fraction> {
   }
   
   void get(const uint32_t idx, const char** fraction, uint32_t* len) const {
-    auto f = *(begin() + idx);
+    auto f = (*this)[idx];
     *fraction = (const char*)f->data();
     *len = f->size();
   }
-  
+
   //compare fraction
   const Condition::Comp compare(const Key& other, uint32_t max=0, 
                                 bool empty_ok=false) const {
     Condition::Comp comp = Condition::EQ;
     bool on_fraction = max;
+    auto f1_end = end();
     auto f2 = other.begin();
-    for(auto f1 = begin(); f1 < end() && f2 < other.end(); ++f1, ++f2) {
+    auto f2_end = other.end();
+    for(auto f1 = begin(); f1 < f1_end && f2 < f2_end; ++f1, ++f2) {
       if(!(*f1)->size() && empty_ok)
         continue;
 
@@ -183,9 +263,10 @@ class Key : public std::vector<Fraction> {
   const bool compare(const Key& other, Condition::Comp break_if,
                      uint32_t max=0, bool empty_ok=false) const {
     bool on_fraction = max;
-    auto f1 = begin();
+    auto f1_end = end();
     auto f2 = other.begin();
-    for(; f1 < end() && f2 < other.end(); ++f1, ++f2) {
+    auto f2_end = other.end();
+    for(auto f1 = begin(); f1 < f1_end && f2 < f2_end; ++f1, ++f2) {
       if(!(*f1)->size() && empty_ok)
         continue;
 
@@ -210,8 +291,11 @@ class Key : public std::vector<Fraction> {
         copy(other);
       return chg;
     }
+    auto f1_end = end();
     auto f2 = other.begin();
-    for(auto f1 = begin(); f1 < end() && f2 < other.end(); ++f1, ++f2) {
+    auto f2_end = other.end();
+    for(auto f1 = begin(); f1 < f1_end && f2 < f2_end; ++f1, ++f2) {
+
       if(Condition::condition((const uint8_t*)(*f1)->data(), (*f1)->size(),
                               (const uint8_t*)(*f2)->data(), (*f2)->size()
                               ) == comp) {
@@ -220,7 +304,7 @@ class Key : public std::vector<Fraction> {
         chg = true;
       }
     }
-    for(;f2 < other.end(); ++f2) {
+    for(;f2 < f2_end; ++f2) {
       add(*f2);
       chg = true;
     }
@@ -230,7 +314,8 @@ class Key : public std::vector<Fraction> {
   const bool align(Key& start, Key& finish) const {
     bool chg = false;
     uint32_t c = 0;
-    for(auto it = begin(); it < end(); ++it, ++c) {
+    auto it_end = end();
+    for(auto it = begin(); it < it_end; ++it, ++c) {
 
       if(c == start.size()) {
         start.add(*it);
@@ -278,10 +363,9 @@ class Key : public std::vector<Fraction> {
   void decode(const uint8_t **bufp, size_t* remainp, bool owner = true) {
     free();
     uint32_t len;
-    resize(Serialization::decode_vi32(bufp, remainp));
-    for(auto it = begin(); it<end(); ++it) {
+    for(auto c = Serialization::decode_vi32(bufp, remainp); c;--c) {
       len = Serialization::decode_vi32(bufp, remainp);
-      *it = Mem::Item::make(*bufp, len);
+      add(*bufp, len);
       *bufp += len;
       *remainp -= len;
     }
@@ -298,10 +382,8 @@ class Key : public std::vector<Fraction> {
 
   void read(const std::vector<std::string>& key)  {
     free();
-    resize(key.size());
-    auto it = begin();
-    for(auto it_k = key.begin(); it_k<key.end(); ++it_k, ++it)
-      *it = Mem::Item::make((const uint8_t *)it_k->data(), it_k->length());
+    for(auto it = key.begin(); it<key.end(); ++it)
+      add(*it);
   }
 
   const bool equal(const std::vector<std::string>& key) const {
@@ -309,8 +391,8 @@ class Key : public std::vector<Fraction> {
       return false;
     auto f = key.begin(); 
     for(auto it = begin(); it<end(); ++it, ++f) {
-      if(!Condition::eq((*it)->data(), (*it)->size(), 
-                        (const uint8_t *)f->data(), f->length()))
+      if((*it)->size() != f->length() || 
+         memcmp((*it)->data(), f->data(), f->length()) != 0)
         return false;
     }
     return true;

@@ -555,6 +555,8 @@ class Range : public DB::RangeBase {
         //  cell.control |= DB::Cells::REV_IS_TS;
         
         blocks.add_logged(cell, intval_chg);
+        
+        intval_chg = align(cell.key);
       }
       blocks.processing_decrement();
 
