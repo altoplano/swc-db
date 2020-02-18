@@ -56,9 +56,7 @@ int main() {
   }
   
   std::cout << " release  begin\n";
-  for(auto arr : data) {
-    arr.release();
-  }
+  data.clear();
   std::cout << " release  end\n";
         
         

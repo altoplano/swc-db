@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <string>
 #include <cstring>
+#include <cassert>
 
 
 
@@ -93,10 +94,13 @@ struct Item final {
            (size_ == other.size() && memcmp(data_, other.data(), size_) < 0);
   }
 
+  const bool equal(const Item& other) const {
+    return Condition::eq(data_, size_, other.data(), other.size());
+  }
 
   struct Equal {
     bool operator()(const Ptr lhs, const Ptr rhs) const {
-      return Condition::eq(lhs->data(), lhs->size(), rhs->data(), rhs->size());
+      return lhs->equal(*rhs);
     }
   };
 
@@ -172,6 +176,83 @@ class Page : public PageBase {
 
 };
 
+/* Vector with narrow on hash
+typedef std::vector<Item::Ptr> PageBase;
+class Page : public PageBase {
+  //public std::set<Item::Ptr, Item::Less> {
+  public:
+
+
+  Item::Ptr use(const uint8_t* buf, uint32_t sz) {
+    LockAtomic::Unique::Scope lock(m_mutex);
+    //std::scoped_lock lock(m_mutex);
+
+    auto ptr = new Item(buf, sz);
+
+    auto it = begin() + _narrow(*ptr);
+    for(; it < end() && (*it)->hash() <= ptr->hash(); ++it) {
+      if((*it)->hash() == ptr->hash() && (*it)->equal(*ptr)) {
+        ptr->data_ = nullptr;
+        delete ptr;
+        return (*it)->use();
+      }
+    }
+    ptr->allocate();
+    insert(it, ptr);
+    return ptr->use();
+  }
+  
+  void free(Item::Ptr ptr) {
+    LockAtomic::Unique::Scope lock(m_mutex);
+
+    for(auto it = begin() + _narrow(*ptr); 
+        it < end() && (*it)->hash() <= ptr->hash(); ++it) {
+      if((*it)->hash() == ptr->hash() && (*it)->equal(*ptr)) {
+        delete *it;
+        erase(it);
+        return;
+      }
+    }
+    assert(!ptr);
+  }
+
+  const size_t count() const {
+    LockAtomic::Unique::Scope lock(m_mutex);
+    return size();
+  }
+
+  private:
+    
+  size_t _narrow(const Item& item) const {
+    size_t offset = 0;
+    if(size() < narrow_sz || !item.size())
+      return offset;
+
+    size_t sz = size() >> 1;
+    offset = sz; 
+    for(;;) {
+      if((*(begin() + offset))->hash() < item.hash()) {
+        if(sz < narrow_sz)
+          break;
+        offset += sz >>= 1; 
+        continue;
+      }
+      if((sz >>= 1) == 0)
+        ++sz;  
+      if(offset < sz) {
+        offset = 0;
+        break;
+      }
+      offset -= sz;
+    }
+    return offset;
+  }
+
+  mutable LockAtomic::Unique    m_mutex;
+  static const size_t           narrow_sz = 20;
+
+};
+*/
 
 
 class Arena final {
